@@ -1,6 +1,9 @@
 Flask
-pandas
-numpy
-openpyxl
-xlsxwriter
 gunicorn
+python-dotenv
+pandas
+gspread
+google-auth
+gspread-formatting
+XlsxWriter
+pytz
