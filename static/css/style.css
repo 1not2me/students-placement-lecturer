@@ -220,3 +220,37 @@ tr.bad td:last-child{
         width:100%;
     }
 }
+.examples{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:1.4rem;
+    align-items:flex-start;
+}
+
+/* מסגרת לכל דוגמה (סטודנטים / אתרים) */
+.examples > div{
+    background:#F9FAFF;
+    padding:0.9rem 1rem 1rem;
+    border-radius:18px;
+    border:1px solid rgba(226,232,255,0.9);
+    box-shadow:0 6px 16px rgba(15,23,42,0.04);
+}
+
+/* כותרת קטנה בתוך המסגרת */
+.examples h3{
+    margin:0 0 0.4rem;
+    font-size:1rem;
+    font-weight:700;
+    color:#111827;
+}
+
+/* לוודא שהטבלה נשארת בתוך המסגרת */
+.examples .table-wrap{
+    margin-top:0.2rem;
+    overflow-x:auto;
+}
+
+.examples table{
+    width:100%;
+}
+
