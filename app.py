@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
+import os
 from flask import Flask, render_template, request, send_file
+from markupsafe import Markup
 import pandas as pd
 import numpy as np
 from io import BytesIO
@@ -8,12 +10,58 @@ from typing import Any, List, Optional
 
 app = Flask(__name__)
 
+# ---------- מצב תחזוקה / סגור ----------
+@app.before_request
+def maintenance_mode():
+    """
+    אם במשתני סביבה יש MAINTENANCE_MODE=1
+    כל בקשה תחזיר דף 'האתר סגור'.
+    לפתיחה: לשנות ל-0 או להסיר את המשתנה.
+    """
+    if os.getenv("MAINTENANCE_MODE", "0") == "1":
+        html = """
+        <html lang="he" dir="rtl">
+        <head>
+          <meta charset="utf-8">
+          <title>האתר סגור</title>
+          <style>
+            body{
+              font-family:system-ui,-apple-system,Segoe UI,Heebo,Arial;
+              background:#f8fafc;
+              direction:rtl;
+              text-align:center;
+              margin:0;
+              padding-top:120px;
+              color:#111827;
+            }
+            .box{
+              display:inline-block;
+              padding:32px 40px;
+              border-radius:18px;
+              background:#ffffff;
+              box-shadow:0 10px 30px rgba(15,23,42,.08);
+              border:1px solid #e5e7eb;
+            }
+            h1{margin:0 0 12px;font-size:26px;}
+            p{margin:0;color:#6b7280;}
+          </style>
+        </head>
+        <body>
+          <div class="box">
+            <h1>⚙️ האתר סגור כרגע</h1>
+            <p>הגישה למערכת שיבוץ הוגבלה זמנית.</p>
+          </div>
+        </body>
+        </html>
+        """
+        return Markup(html), 503
+
 # ========= מודל ניקוד =========
 @dataclass
 class Weights:
-    w_field: float = 0.50
-    w_city: float = 0.05
-    w_special: float = 0.45
+    w_field: float = 0.50   # תחום
+    w_city: float = 0.05    # עיר
+    w_special: float = 0.45 # בקשות מיוחדות
 
 # עמודות סטודנטים
 STU_COLS = {
@@ -43,7 +91,7 @@ SITE_COLS = {
     "review": ["חוות דעת מדריך"]
 }
 
-# ========= פונקציות עזר =========
+# ========= עזר =========
 def pick_col(df: pd.DataFrame, options: List[str]) -> Optional[str]:
     for opt in options:
         if opt in df.columns:
@@ -56,7 +104,6 @@ def read_any(uploaded) -> pd.DataFrame:
         return pd.read_csv(uploaded, encoding="utf-8-sig")
     if name.endswith((".xlsx", ".xls")):
         return pd.read_excel(uploaded)
-    # ברירת מחדל
     return pd.read_csv(uploaded, encoding="utf-8-sig")
 
 def normalize_text(x: Any) -> str:
@@ -64,44 +111,76 @@ def normalize_text(x: Any) -> str:
         return ""
     return str(x).strip()
 
+# --- סטודנטים ---
+def resolve_students(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy()
+    out["stu_id"] = out[pick_col(out, STU_COLS["id"])]
+    out["stu_first"] = out[pick_col(out, STU_COLS["first"])]
+    out["stu_last"] = out[pick_col(out, STU_COLS["last"])]
+    out["stu_city"] = out[pick_col(out, STU_COLS["city"])] if pick_col(out, STU_COLS["city"]) else ""
+    out["stu_pref"] = out[pick_col(out, STU_COLS["preferred_field"])] if pick_col(out, STU_COLS["preferred_field"]) else ""
+    out["stu_req"] = out[pick_col(out, STU_COLS["special_req"])] if pick_col(out, STU_COLS["special_req"]) else ""
+
+    for c in ["stu_id", "stu_first", "stu_last", "stu_city", "stu_pref", "stu_req"]:
+        out[c] = out[c].apply(normalize_text)
+    return out
+
+# --- אתרים ---
+def resolve_sites(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy()
+    out["site_name"] = out[pick_col(out, SITE_COLS["name"])]
+    out["site_field"] = out[pick_col(out, SITE_COLS["field"])]
+    out["site_city"] = out[pick_col(out, SITE_COLS["city"])]
+
+    cap_col = pick_col(out, SITE_COLS["capacity"])
+    if cap_col:
+        out["site_capacity"] = pd.to_numeric(out[cap_col], errors="coerce").fillna(1).astype(int)
+    else:
+        out["site_capacity"] = 1
+
+    out["capacity_left"] = out["site_capacity"].astype(int)
+
+    sup_first = pick_col(out, SITE_COLS["sup_first"])
+    sup_last = pick_col(out, SITE_COLS["sup_last"])
+    out["שם המדריך"] = ""
+    if sup_first or sup_last:
+        ff = out[sup_first] if sup_first else ""
+        ll = out[sup_last] if sup_last else ""
+        out["שם המדריך"] = (ff.astype(str) + " " + ll.astype(str)).str.strip()
+
+    for c in ["site_name", "site_field", "site_city", "שם המדריך"]:
+        out[c] = out[c].apply(normalize_text)
+
+    return out
+
+# --- ציון + פירוק לפי 50/45/5 ---
 def compute_score_with_explain(stu: pd.Series, site: pd.Series, W: Weights):
-    # נורמליזציה
     stu_city   = normalize_text(stu.get("stu_city", "")).lower()
     site_city  = normalize_text(site.get("site_city", "")).lower()
     stu_pref   = normalize_text(stu.get("stu_pref", "")).lower()
     site_field = normalize_text(site.get("site_field", "")).lower()
     stu_req    = normalize_text(stu.get("stu_req", ""))
 
-    # ----- 1) תחום – 50% -----
-    # יש תחום מועדף והוא מופיע בתחום המוסד → 100
-    # יש תחום מועדף והוא לא מתאים → 0
-    # אין תחום מועדף → ניטרלי 70
+    # 1) תחום – 50%
     if stu_pref:
-        if stu_pref in site_field:
-            field_component = 100
-        else:
-            field_component = 0
+        field_component = 100 if stu_pref in site_field else 0
     else:
-        field_component = 70
+        field_component = 70  # ניטרלי חלקית
 
-    # ----- 2) עיר – 5% -----
-    # אותה עיר → 100, אחרת → 0, בלי עיר → 50 (ניטרלי)
+    # 2) עיר – 5%
     if stu_city and site_city:
         city_component = 100 if stu_city == site_city else 0
     else:
-        city_component = 50
+        city_component = 50  # ניטרלי
 
-    # ----- 3) בקשות מיוחדות – 45% -----
-    # דוגמה: "קרוב" / "קרוב לבית"
-    # אם ביקש קרוב והמוסד באותה עיר → 100, אחרת → 0
-    # אם אין בקשה מיוחדת → 50
+    # 3) בקשות מיוחדות – 45%
     if "קרוב" in stu_req:
         if stu_city and site_city and stu_city == site_city:
             special_component = 100
         else:
             special_component = 0
     else:
-        special_component = 50
+        special_component = 50  # ניטרלי כשאין בקשה
 
     parts = {
         "התאמת תחום": round(W.w_field * field_component),          # 50%
@@ -113,11 +192,10 @@ def compute_score_with_explain(stu: pd.Series, site: pd.Series, W: Weights):
     score = int(np.clip(sum(parts.values()), 0, 100))
     return score, parts
 
-
 # --- שיבוץ חמדני ---
 def greedy_match(students_df: pd.DataFrame, sites_df: pd.DataFrame, W: Weights) -> pd.DataFrame:
     results = []
-    supervisor_count = {}  # עד 2 סטודנטים למדריך (ניתן לשנות)
+    supervisor_count = {}  # דוגמה: עד 2 סטודנטים לכל מדריך
 
     for _, s in students_df.iterrows():
         cand = sites_df[sites_df["capacity_left"] > 0].copy()
@@ -136,14 +214,14 @@ def greedy_match(students_df: pd.DataFrame, sites_df: pd.DataFrame, W: Weights) 
             })
             continue
 
-        # חישוב ציון
+        # ציון לכל אתר
         def score_row(r):
             sc, parts = compute_score_with_explain(s, r, W)
             return pd.Series({"score": sc, "_parts": parts})
 
         cand[["score", "_parts"]] = cand.apply(score_row, axis=1)
 
-        # הגבלת מדריכים (עד 2 סטודנטים)
+        # הגבלת עד 2 סטודנטים למדריך
         def allowed_supervisor(r):
             sup = r.get("שם המדריך", "")
             return supervisor_count.get(sup, 0) < 2
@@ -151,7 +229,6 @@ def greedy_match(students_df: pd.DataFrame, sites_df: pd.DataFrame, W: Weights) 
         filtered = cand[cand.apply(allowed_supervisor, axis=1)]
 
         if filtered.empty:
-            # אם אין מדריך פנוי, בוחרים מהמוסדות עם capacity בלבד
             all_sites = sites_df[sites_df["capacity_left"] > 0].copy()
             if all_sites.empty:
                 results.append({
@@ -216,10 +293,11 @@ def df_to_xlsx_bytes(df: pd.DataFrame, sheet_name: str = "שיבוץ") -> bytes:
     xlsx_io.seek(0)
     return xlsx_io.getvalue()
 
-# ========= משתנים גלובליים פשוטים לדוחות =========
-last_results_df = None
-last_summary_df = None
+# ========= משתנים לדוחות =========
+last_results_df: Optional[pd.DataFrame] = None
+last_summary_df: Optional[pd.DataFrame] = None
 
+# ========= ראוט ראשי =========
 @app.route("/", methods=["GET", "POST"])
 def index():
     global last_results_df, last_summary_df
@@ -250,7 +328,7 @@ def index():
             base_df = greedy_match(students, sites, Weights())
             last_results_df = base_df.copy()
 
-            # טבלת תוצאות מרכזית
+            # טבלת תוצאות להצגה
             df_show = pd.DataFrame({
                 "אחוז התאמה": base_df["אחוז התאמה"].astype(int),
                 "שם הסטודנט/ית": (base_df["שם פרטי"].astype(str) + " " + base_df["שם משפחה"].astype(str)).str.strip(),
@@ -261,7 +339,7 @@ def index():
                 "שם המדריך/ה": base_df["שם המדריך"],
             }).sort_values("אחוז התאמה", ascending=False)
 
-            # דוח סיכום לפי מקום הכשרה
+            # סיכום לפי מקום הכשרה
             summary_df = (
                 base_df
                 .groupby(["שם מקום ההתמחות", "תחום ההתמחות במוסד", "שם המדריך"])
@@ -287,7 +365,7 @@ def index():
             ]]
             last_summary_df = summary_df.copy()
 
-            # דוח קיבולות
+            # קיבולות
             caps = sites.groupby("site_name")["site_capacity"].sum().to_dict()
             assigned = base_df.groupby("שם מקום ההתמחות")["ת\"ז הסטודנט"].count().to_dict()
             cap_rows = []
@@ -301,16 +379,15 @@ def index():
                 })
             cap_df = pd.DataFrame(cap_rows).sort_values("שם מקום ההתמחות")
 
-            # הסבר ציון לשורה הראשונה (אפשר להרחיב ב-JS לפי בחירה)
+            # הסבר לדוגמה – שורה ראשונה
             expl_for_first = None
             if len(base_df) > 0:
                 first = base_df.iloc[0]
-                parts = first["_expl"]
                 expl_for_first = {
                     "student": f"{first['שם פרטי']} {first['שם משפחה']}",
                     "site": first["שם מקום ההתמחות"],
                     "score": int(first["אחוז התאמה"]),
-                    "parts": parts
+                    "parts": first["_expl"]
                 }
 
             context.update({
@@ -326,6 +403,7 @@ def index():
 
     return render_template("index.html", **context)
 
+# ========= הורדת קבצים =========
 @app.route("/download/results")
 def download_results():
     global last_results_df
@@ -365,5 +443,5 @@ def download_summary():
     )
 
 if __name__ == "__main__":
-    app.run(debug=True)
-
+    # לוקאלית; ב-Render משתמשים ב-gunicorn עם app:app
+    app.run(debug=True, host="0.0.0.0", port=5000)
