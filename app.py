@@ -49,7 +49,7 @@ def maintenance_mode():
         <body>
           <div class="box">
             <h1>⚙️ האתר סגור כרגע</h1>
-            <p>הגישה למערכת שיבוץ הוגבלה זמנית.</p>
+            <p>הגישה למערכת השיבוץ מוגבלת זמנית.</p>
           </div>
         </body>
         </html>
@@ -91,7 +91,7 @@ SITE_COLS = {
     "review": ["חוות דעת מדריך"]
 }
 
-# ========= עזר =========
+# ========= פונקציות עזר =========
 def pick_col(df: pd.DataFrame, options: List[str]) -> Optional[str]:
     for opt in options:
         if opt in df.columns:
@@ -165,7 +165,7 @@ def compute_score_with_explain(stu: pd.Series, site: pd.Series, W: Weights):
     if stu_pref:
         field_component = 100 if stu_pref in site_field else 0
     else:
-        field_component = 70  # ניטרלי חלקית
+        field_component = 70  # ניטרלי חלקי
 
     # 2) עיר – 5%
     if stu_city and site_city:
@@ -183,9 +183,9 @@ def compute_score_with_explain(stu: pd.Series, site: pd.Series, W: Weights):
         special_component = 50  # ניטרלי כשאין בקשה
 
     parts = {
-        "התאמת תחום": round(W.w_field * field_component),          # 50%
-        "מרחק/גיאוגרפיה": round(W.w_city * city_component),        # 5%
-        "בקשות מיוחדות": round(W.w_special * special_component),   # 45%
+        "התאמת תחום": round(W.w_field * field_component),
+        "מרחק/גיאוגרפיה": round(W.w_city * city_component),
+        "בקשות מיוחדות": round(W.w_special * special_component),
         "עדיפויות הסטודנט/ית": 0
     }
 
@@ -195,7 +195,7 @@ def compute_score_with_explain(stu: pd.Series, site: pd.Series, W: Weights):
 # --- שיבוץ חמדני ---
 def greedy_match(students_df: pd.DataFrame, sites_df: pd.DataFrame, W: Weights) -> pd.DataFrame:
     results = []
-    supervisor_count = {}  # דוגמה: עד 2 סטודנטים לכל מדריך
+    supervisor_count = {}  # עד 2 סטודנטים לכל מדריך (ניתן לשנות)
 
     for _, s in students_df.iterrows():
         cand = sites_df[sites_df["capacity_left"] > 0].copy()
@@ -205,7 +205,7 @@ def greedy_match(students_df: pd.DataFrame, sites_df: pd.DataFrame, W: Weights) 
                 "ת\"ז הסטודנט": s["stu_id"],
                 "שם פרטי": s["stu_first"],
                 "שם משפחה": s["stu_last"],
-                "שם מקום ההתמחות": "לא שובץ",
+                "שם מקוםהתמחות": "לא שובץ",
                 "עיר המוסד": "",
                 "תחום ההתמחות במוסד": "",
                 "שם המדריך": "",
@@ -214,14 +214,12 @@ def greedy_match(students_df: pd.DataFrame, sites_df: pd.DataFrame, W: Weights) 
             })
             continue
 
-        # ציון לכל אתר
         def score_row(r):
             sc, parts = compute_score_with_explain(s, r, W)
             return pd.Series({"score": sc, "_parts": parts})
 
         cand[["score", "_parts"]] = cand.apply(score_row, axis=1)
 
-        # הגבלת עד 2 סטודנטים למדריך
         def allowed_supervisor(r):
             sup = r.get("שם המדריך", "")
             return supervisor_count.get(sup, 0) < 2
@@ -251,7 +249,6 @@ def greedy_match(students_df: pd.DataFrame, sites_df: pd.DataFrame, W: Weights) 
         chosen = filtered.iloc[0]
         idx = chosen.name
 
-        # עדכון קיבולת
         sites_df.at[idx, "capacity_left"] -= 1
         sup_name = chosen.get("שם המדריך", "")
         supervisor_count[sup_name] = supervisor_count.get(sup_name, 0) + 1
@@ -293,7 +290,7 @@ def df_to_xlsx_bytes(df: pd.DataFrame, sheet_name: str = "שיבוץ") -> bytes:
     xlsx_io.seek(0)
     return xlsx_io.getvalue()
 
-# ========= משתנים לדוחות =========
+# ========= משתנים גלובליים =========
 last_results_df: Optional[pd.DataFrame] = None
 last_summary_df: Optional[pd.DataFrame] = None
 
@@ -328,7 +325,6 @@ def index():
             base_df = greedy_match(students, sites, Weights())
             last_results_df = base_df.copy()
 
-            # טבלת תוצאות להצגה
             df_show = pd.DataFrame({
                 "אחוז התאמה": base_df["אחוז התאמה"].astype(int),
                 "שם הסטודנט/ית": (base_df["שם פרטי"].astype(str) + " " + base_df["שם משפחה"].astype(str)).str.strip(),
@@ -339,7 +335,6 @@ def index():
                 "שם המדריך/ה": base_df["שם המדריך"],
             }).sort_values("אחוז התאמה", ascending=False)
 
-            # סיכום לפי מקום הכשרה
             summary_df = (
                 base_df
                 .groupby(["שם מקום ההתמחות", "תחום ההתמחות במוסד", "שם המדריך"])
@@ -365,7 +360,6 @@ def index():
             ]]
             last_summary_df = summary_df.copy()
 
-            # קיבולות
             caps = sites.groupby("site_name")["site_capacity"].sum().to_dict()
             assigned = base_df.groupby("שם מקום ההתמחות")["ת\"ז הסטודנט"].count().to_dict()
             cap_rows = []
@@ -379,7 +373,6 @@ def index():
                 })
             cap_df = pd.DataFrame(cap_rows).sort_values("שם מקום ההתמחות")
 
-            # הסבר לדוגמה – שורה ראשונה
             expl_for_first = None
             if len(base_df) > 0:
                 first = base_df.iloc[0]
@@ -403,7 +396,7 @@ def index():
 
     return render_template("index.html", **context)
 
-# ========= הורדת קבצים =========
+# ========= הורדות =========
 @app.route("/download/results")
 def download_results():
     global last_results_df
@@ -443,5 +436,4 @@ def download_summary():
     )
 
 if __name__ == "__main__":
-    # לוקאלית; ב-Render משתמשים ב-gunicorn עם app:app
     app.run(debug=True, host="0.0.0.0", port=5000)
