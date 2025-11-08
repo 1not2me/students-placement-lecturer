@@ -64,49 +64,6 @@ def normalize_text(x: Any) -> str:
         return ""
     return str(x).strip()
 
-# --- סטודנטים ---
-def resolve_students(df: pd.DataFrame) -> pd.DataFrame:
-    out = df.copy()
-    out["stu_id"] = out[pick_col(out, STU_COLS["id"])]
-    out["stu_first"] = out[pick_col(out, STU_COLS["first"])]
-    out["stu_last"] = out[pick_col(out, STU_COLS["last"])]
-    out["stu_city"] = out[pick_col(out, STU_COLS["city"])] if pick_col(out, STU_COLS["city"]) else ""
-    out["stu_pref"] = out[pick_col(out, STU_COLS["preferred_field"])] if pick_col(out, STU_COLS["preferred_field"]) else ""
-    out["stu_req"] = out[pick_col(out, STU_COLS["special_req"])] if pick_col(out, STU_COLS["special_req"]) else ""
-
-    for c in ["stu_id", "stu_first", "stu_last", "stu_city", "stu_pref", "stu_req"]:
-        out[c] = out[c].apply(normalize_text)
-    return out
-
-# --- אתרים ---
-def resolve_sites(df: pd.DataFrame) -> pd.DataFrame:
-    out = df.copy()
-    out["site_name"] = out[pick_col(out, SITE_COLS["name"])]
-    out["site_field"] = out[pick_col(out, SITE_COLS["field"])]
-    out["site_city"] = out[pick_col(out, SITE_COLS["city"])]
-
-    cap_col = pick_col(out, SITE_COLS["capacity"])
-    if cap_col:
-        out["site_capacity"] = pd.to_numeric(out[cap_col], errors="coerce").fillna(1).astype(int)
-    else:
-        out["site_capacity"] = 1
-
-    out["capacity_left"] = out["site_capacity"].astype(int)
-
-    sup_first = pick_col(out, SITE_COLS["sup_first"])
-    sup_last = pick_col(out, SITE_COLS["sup_last"])
-    out["שם המדריך"] = ""
-    if sup_first or sup_last:
-        ff = out[sup_first] if sup_first else ""
-        ll = out[sup_last] if sup_last else ""
-        out["שם המדריך"] = (ff.astype(str) + " " + ll.astype(str)).str.strip()
-
-    for c in ["site_name", "site_field", "site_city", "שם המדריך"]:
-        out[c] = out[c].apply(normalize_text)
-
-    return out
-
-# --- ציון + פירוק ---
 def compute_score_with_explain(stu: pd.Series, site: pd.Series, W: Weights):
     # נורמליזציה
     stu_city   = normalize_text(stu.get("stu_city", "")).lower()
@@ -116,9 +73,9 @@ def compute_score_with_explain(stu: pd.Series, site: pd.Series, W: Weights):
     stu_req    = normalize_text(stu.get("stu_req", ""))
 
     # ----- 1) תחום – 50% -----
-    # יש תחום מועדף, והוא מופיע בתחום המוסד → 100
+    # יש תחום מועדף והוא מופיע בתחום המוסד → 100
     # יש תחום מועדף והוא לא מתאים → 0
-    # אין תחום מועדף → ערך ניטרלי (70) שלא מוחק את הסטודנט
+    # אין תחום מועדף → ניטרלי 70
     if stu_pref:
         if stu_pref in site_field:
             field_component = 100
@@ -128,19 +85,17 @@ def compute_score_with_explain(stu: pd.Series, site: pd.Series, W: Weights):
         field_component = 70
 
     # ----- 2) עיר – 5% -----
-    # אותה עיר → 100, אחרת → 0
-    # אם חסר מידע על עיר → ניטרלי 50
+    # אותה עיר → 100, אחרת → 0, בלי עיר → 50 (ניטרלי)
     if stu_city and site_city:
         city_component = 100 if stu_city == site_city else 0
     else:
         city_component = 50
 
     # ----- 3) בקשות מיוחדות – 45% -----
-    # כרגע מטפלים ב"קרוב" / "קרוב לבית":
-    # אם הסטודנט ביקש קרוב והאתר באותה עיר → 100, אחרת 0.
-    # אם אין בקשה מיוחדת → ניטרלי 50.
-    req_text = stu_req
-    if "קרוב" in req_text:
+    # דוגמה: "קרוב" / "קרוב לבית"
+    # אם ביקש קרוב והמוסד באותה עיר → 100, אחרת → 0
+    # אם אין בקשה מיוחדת → 50
+    if "קרוב" in stu_req:
         if stu_city and site_city and stu_city == site_city:
             special_component = 100
         else:
@@ -148,12 +103,11 @@ def compute_score_with_explain(stu: pd.Series, site: pd.Series, W: Weights):
     else:
         special_component = 50
 
-    # משקלול לפי האחוזים
     parts = {
-        "התאמת תחום": round(W.w_field * field_component),      # 50%
-        "מרחק/גיאוגרפיה": round(W.w_city * city_component),    # 5%
-        "בקשות מיוחדות": round(W.w_special * special_component),  # 45%
-        "עדיפויות הסטודנט/ית": 0  # לא בשימוש כרגע
+        "התאמת תחום": round(W.w_field * field_component),          # 50%
+        "מרחק/גיאוגרפיה": round(W.w_city * city_component),        # 5%
+        "בקשות מיוחדות": round(W.w_special * special_component),   # 45%
+        "עדיפויות הסטודנט/ית": 0
     }
 
     score = int(np.clip(sum(parts.values()), 0, 100))
@@ -412,3 +366,4 @@ def download_summary():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
