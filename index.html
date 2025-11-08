@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <title>מערכת שיבוץ סטודנטים – התאמה חכמה</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="page-wrap">
+    <h1>מערכת שיבוץ סטודנטים – התאמה חכמה</h1>
+    <p class="subtitle">
+        העלו קובץ סטודנטים וקובץ אתרי התמחות, בצעו שיבוץ חכם לפי תחום, עיר ובקשות מיוחדות, והורידו קובצי XLSX מסודרים.
+    </p>
+
+    <section class="card">
+        <h2>📤 העלאת קבצים וביצוע שיבוץ</h2>
+        <form method="post" enctype="multipart/form-data" class="upload-form">
+            <div class="field">
+                <label>קובץ סטודנטים (CSV / XLSX)</label>
+                <input type="file" name="students_file" required>
+            </div>
+            <div class="field">
+                <label>קובץ אתרי התמחות / מדריכים (CSV / XLSX)</label>
+                <input type="file" name="sites_file" required>
+            </div>
+            <button type="submit" class="primary-btn">🚀 בצע שיבוץ</button>
+        </form>
+
+        {% if error %}
+            <div class="alert error">{{ error }}</div>
+        {% endif %}
+    </section>
+
+    {% if results %}
+    <section class="card">
+        <h2>📊 תוצאות השיבוץ</h2>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>אחוז התאמה</th>
+                        <th>שם הסטודנט/ית</th>
+                        <th>תעודת זהות</th>
+                        <th>תחום התמחות</th>
+                        <th>עיר המוסד</th>
+                        <th>שם מקום ההתמחות</th>
+                        <th>שם המדריך/ה</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in results %}
+                    <tr>
+                        <td class="score">{{ row["אחוז התאמה"] }}</td>
+                        <td>{{ row["שם הסטודנט/ית"] }}</td>
+                        <td>{{ row["תעודת זהות"] }}</td>
+                        <td>{{ row["תחום התמחות"] or "" }}</td>
+                        <td>{{ row["עיר המוסד"] or "" }}</td>
+                        <td>{{ row["שם מקום ההתמחות"] or "" }}</td>
+                        <td>{{ row["שם המדריך/ה"] or "" }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="btn-row">
+            <a href="{{ url_for('download_results') }}" class="primary-btn">⬇️ הורדת XLSX – תוצאות השיבוץ</a>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if expl_for_first %}
+    <section class="card">
+        <h2>🧩 הסבר ציון לדוגמה</h2>
+        <p>
+            סטודנט/ית: <strong>{{ expl_for_first.student }}</strong>,
+            מקום התמחות: <strong>{{ expl_for_first.site }}</strong>,
+            ציון סופי: <strong>{{ expl_for_first.score }}%</strong>
+        </p>
+        <div class="table-wrap small">
+            <table>
+                <thead>
+                    <tr>
+                        <th>מרכיב</th>
+                        <th>תרומה לציון</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for k, v in expl_for_first.parts.items() %}
+                    <tr>
+                        <td>{{ k }}</td>
+                        <td>{{ v }}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr>
+                        <td><strong>סה״כ</strong></td>
+                        <td><strong>{{ expl_for_first.score }}</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="hint">
+            (ניתן להרחיב בהמשך לבחירת סטודנט/ית ספציפיים עם JavaScript לפי הצורך.)
+        </p>
+    </section>
+    {% endif %}
+
+    {% if summary %}
+    <section class="card">
+        <h2>📝 טבלת סיכום לפי מקום הכשרה</h2>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>שם מקום ההתמחות</th>
+                        <th>תחום</th>
+                        <th>שם המדריך</th>
+                        <th>כמה סטודנטים</th>
+                        <th>המלצת שיבוץ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in summary %}
+                    <tr>
+                        <td>{{ row["שם מקום ההתמחות"] }}</td>
+                        <td>{{ row["תחום ההתמחות במוסד"] }}</td>
+                        <td>{{ row["שם המדריך"] or "" }}</td>
+                        <td>{{ row["כמה סטודנטים"] }}</td>
+                        <td>{{ row["המלצת שיבוץ"] }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="btn-row">
+            <a href="{{ url_for('download_summary') }}" class="primary-btn">⬇️ הורדת XLSX – טבלת סיכום</a>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if capacities %}
+    <section class="card">
+        <h2>🏷️ דוח קיבולות לפי מקום הכשרה</h2>
+        <div class="table-wrap small">
+            <table>
+                <thead>
+                    <tr>
+                        <th>שם מקום ההתמחות</th>
+                        <th>קיבולת</th>
+                        <th>שובצו בפועל</th>
+                        <th>יתרה/חוסר</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in capacities %}
+                    <tr class="{% if row['יתרה/חוסר'] < 0 %}bad{% elif row['יתרה/חוסר'] > 0 %}good{% endif %}">
+                        <td>{{ row["שם מקום ההתמחות"] }}</td>
+                        <td>{{ row["קיבולת"] }}</td>
+                        <td>{{ row["שובצו בפועל"] }}</td>
+                        <td>{{ row["יתרה/חוסר"] }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endif %}
+</div>
+</body>
+</html>
