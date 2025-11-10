@@ -1,11 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;800&family=Rubik:wght@400;600;800&display=swap');
 
 :root {
-    --bg-1:#e0f7fa;
-    --bg-2:#ede7f6;
-    --bg-3:#fff3e0;
-    --bg-4:#fce4ec;
-    --bg-5:#e8f5e9;
+    --bg-1:#f4fbfb;   /* תכלת־קריר רך */
+    --bg-2:#f7f3fb;   /* סגלגל־לילך בהיר */
+    --bg-3:#fff9ed;   /* צהבהב שמנתי בהיר */
+    --bg-4:#fdf1f4;   /* ורדרד עדין */
+    --bg-5:#f5faf5;   /* ירקרק רך מאוד */
     --ink:#0f172a;
     --primary:#9b5de5;
     --primary-700:#f15bb5;
@@ -280,3 +280,4 @@ tr.bad td:last-child {
         width: 100%;
     }
 }
+
