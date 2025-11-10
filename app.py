@@ -192,7 +192,6 @@ def compute_score_with_explain(stu: pd.Series, site: pd.Series, W: Weights):
     score = int(np.clip(sum(parts.values()), 0, 100))
     return score, parts
 
-# --- שיבוץ חמדני ---
 def greedy_match(students_df: pd.DataFrame, sites_df: pd.DataFrame, W: Weights) -> pd.DataFrame:
     results = []
     supervisor_count = {}  # עד 2 סטודנטים לכל מדריך (ניתן לשנות)
@@ -200,6 +199,7 @@ def greedy_match(students_df: pd.DataFrame, sites_df: pd.DataFrame, W: Weights) 
     for _, s in students_df.iterrows():
         cand = sites_df[sites_df["capacity_left"] > 0].copy()
 
+        # אין בכלל מקומות פנויים
         if cand.empty:
             results.append({
                 "ת\"ז הסטודנט": s["stu_id"],
@@ -210,22 +210,30 @@ def greedy_match(students_df: pd.DataFrame, sites_df: pd.DataFrame, W: Weights) 
                 "תחום ההתמחות במוסד": "",
                 "שם המדריך": "",
                 "אחוז התאמה": 0,
-                "_expl": {"התאמת תחום": 0, "מרחק/גיאוגרפיה": 0, "בקשות מיוחדות": 0, "עדיפויות הסטודנט/ית": 0}
+                "_expl": {
+                    "התאמת תחום": 0,
+                    "מרחק/גיאוגרפיה": 0,
+                    "בקשות מיוחדות": 0,
+                    "עדיפויות הסטודנט/ית": 0
+                }
             })
             continue
 
+        # מחשבים ציון לכל אתר
         def score_row(r):
             sc, parts = compute_score_with_explain(s, r, W)
             return pd.Series({"score": sc, "_parts": parts})
 
         cand[["score", "_parts"]] = cand.apply(score_row, axis=1)
 
+        # מסננים לפי מגבלת מדריך (עד 2 סטודנטים למשל)
         def allowed_supervisor(r):
             sup = r.get("שם המדריך", "")
             return supervisor_count.get(sup, 0) < 2
 
         filtered = cand[cand.apply(allowed_supervisor, axis=1)]
 
+        # אם אין אתר שעובר את סינון המדריכים – בוחרים את הטוב מכל הפנויים
         if filtered.empty:
             all_sites = sites_df[sites_df["capacity_left"] > 0].copy()
             if all_sites.empty:
@@ -238,9 +246,15 @@ def greedy_match(students_df: pd.DataFrame, sites_df: pd.DataFrame, W: Weights) 
                     "תחום ההתמחות במוסד": "",
                     "שם המדריך": "",
                     "אחוז התאמה": 0,
-                    "_expl": {"התאמת תחום": 0, "מרחק/גיאוגרפיה": 0, "בקשות מיוחדות": 0, "עדיפויות הסטודנט/ית": 0}
+                    "_expl": {
+                        "התאמת תחום": 0,
+                        "מרחק/גיאוגרפיה": 0,
+                        "בקשות מיוחדות": 0,
+                        "עדיפויות הסטודנט/ית": 0
+                    }
                 })
                 continue
+
             all_sites[["score", "_parts"]] = all_sites.apply(score_row, axis=1)
             filtered = all_sites.sort_values("score", ascending=False).head(1)
         else:
@@ -249,10 +263,14 @@ def greedy_match(students_df: pd.DataFrame, sites_df: pd.DataFrame, W: Weights) 
         chosen = filtered.iloc[0]
         idx = chosen.name
 
+        # מעדכנים קיבולת
         sites_df.at[idx, "capacity_left"] -= 1
+
+        # מעדכנים ספירת סטודנטים למדריך
         sup_name = chosen.get("שם המדריך", "")
         supervisor_count[sup_name] = supervisor_count.get(sup_name, 0) + 1
 
+        # שורת תוצאה
         results.append({
             "ת\"ז הסטודנט": s["stu_id"],
             "שם פרטי": s["stu_first"],
@@ -437,4 +455,5 @@ def download_summary():
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
+
 
