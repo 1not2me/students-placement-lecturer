@@ -205,7 +205,7 @@ def greedy_match(students_df: pd.DataFrame, sites_df: pd.DataFrame, W: Weights) 
                 "ת\"ז הסטודנט": s["stu_id"],
                 "שם פרטי": s["stu_first"],
                 "שם משפחה": s["stu_last"],
-                "שם מקוםהתמחות": "לא שובץ",
+                "שם מקום ההתמחות": "לא שובץ",
                 "עיר המוסד": "",
                 "תחום ההתמחות במוסד": "",
                 "שם המדריך": "",
@@ -437,3 +437,4 @@ def download_summary():
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
+
