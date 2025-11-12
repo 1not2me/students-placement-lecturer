@@ -120,7 +120,6 @@ def resolve_students(df: pd.DataFrame) -> pd.DataFrame:
     out["stu_city"] = out[pick_col(out, STU_COLS["city"])] if pick_col(out, STU_COLS["city"]) else ""
     out["stu_pref"] = out[pick_col(out, STU_COLS["preferred_field"])] if pick_col(out, STU_COLS["preferred_field"]) else ""
     out["stu_req"] = out[pick_col(out, STU_COLS["special_req"])] if pick_col(out, STU_COLS["special_req"]) else ""
-
     for c in ["stu_id", "stu_first", "stu_last", "stu_city", "stu_pref", "stu_req"]:
         out[c] = out[c].apply(normalize_text)
     return out
@@ -131,13 +130,11 @@ def resolve_sites(df: pd.DataFrame) -> pd.DataFrame:
     out["site_name"] = out[pick_col(out, SITE_COLS["name"])]
     out["site_field"] = out[pick_col(out, SITE_COLS["field"])]
     out["site_city"] = out[pick_col(out, SITE_COLS["city"])]
-
     cap_col = pick_col(out, SITE_COLS["capacity"])
     if cap_col:
         out["site_capacity"] = pd.to_numeric(out[cap_col], errors="coerce").fillna(1).astype(int)
     else:
         out["site_capacity"] = 1
-
     out["capacity_left"] = out["site_capacity"].astype(int)
 
     sup_first = pick_col(out, SITE_COLS["sup_first"])
@@ -150,7 +147,6 @@ def resolve_sites(df: pd.DataFrame) -> pd.DataFrame:
 
     for c in ["site_name", "site_field", "site_city", "שם המדריך"]:
         out[c] = out[c].apply(normalize_text)
-
     return out
 
 # --- ציון + פירוק לפי 50/45/5 ---
@@ -188,7 +184,6 @@ def compute_score_with_explain(stu: pd.Series, site: pd.Series, W: Weights):
         "בקשות מיוחדות": round(W.w_special * special_component),
         "עדיפויות הסטודנט/ית": 0
     }
-
     score = int(np.clip(sum(parts.values()), 0, 100))
     return score, parts
 
@@ -254,7 +249,6 @@ def greedy_match(students_df: pd.DataFrame, sites_df: pd.DataFrame, W: Weights) 
                     }
                 })
                 continue
-
             all_sites[["score", "_parts"]] = all_sites.apply(score_row, axis=1)
             filtered = all_sites.sort_values("score", ascending=False).head(1)
         else:
@@ -321,7 +315,7 @@ def index():
         "results": None,
         "summary": None,
         "capacities": None,
-        "expl_for_first": None,
+        "explanations": None,  # <- לרינדור הדפדוף
         "error": None
     }
 
@@ -343,6 +337,7 @@ def index():
             base_df = greedy_match(students, sites, Weights())
             last_results_df = base_df.copy()
 
+            # טבלת תוצאות להצגה
             df_show = pd.DataFrame({
                 "אחוז התאמה": base_df["אחוז התאמה"].astype(int),
                 "שם הסטודנט/ית": (base_df["שם פרטי"].astype(str) + " " + base_df["שם משפחה"].astype(str)).str.strip(),
@@ -353,6 +348,7 @@ def index():
                 "שם המדריך/ה": base_df["שם המדריך"],
             }).sort_values("אחוז התאמה", ascending=False)
 
+            # סיכום לפי אתר/תחום/מדריך
             summary_df = (
                 base_df
                 .groupby(["שם מקום ההתמחות", "תחום ההתמחות במוסד", "שם המדריך"])
@@ -378,6 +374,7 @@ def index():
             ]]
             last_summary_df = summary_df.copy()
 
+            # קיבולות מול שיבוץ בפועל
             caps = sites.groupby("site_name")["site_capacity"].sum().to_dict()
             assigned = base_df.groupby("שם מקום ההתמחות")["ת\"ז הסטודנט"].count().to_dict()
             cap_rows = []
@@ -391,41 +388,21 @@ def index():
                 })
             cap_df = pd.DataFrame(cap_rows).sort_values("שם מקום ההתמחות")
 
-            expl_for_first = None
-            if len(base_df) > 0:
-                first = base_df.iloc[0]
-                expl_for_first = {
-                    "student": f"{first['שם פרטי']} {first['שם משפחה']}",
-                    "site": first["שם מקום ההתמחות"],
-                    "score": int(first["אחוז התאמה"]),
-                    "parts": first["_expl"]
-                }
-                # ... אחרי base_df = greedy_match(...) וכו'
-
-# בניית רשימת הסברים מלאה לכל הסטודנטים
-explanations = []
-for _, r in base_df.iterrows():
-    explanations.append({
-        "student": f"{r['שם פרטי']} {r['שם משפחה']}",
-        "site": r["שם מקום ההתמחות"],
-        "score": int(r["אחוז התאמה"]),
-        "parts": r["_expl"]  # {"התאמת תחום":..., "מרחק/גיאוגרפיה":..., ...}
-    })
-
-context.update({
-    "results": df_show.to_dict(orient="records"),
-    "summary": summary_df.to_dict(orient="records"),
-    "capacities": cap_df.to_dict(orient="records"),
-    "explanations": explanations,   # <— חדש
-    "error": None
-})
-
+            # הסברים לכל הסטודנטים
+            explanations = []
+            for _, r in base_df.iterrows():
+                explanations.append({
+                    "student": f"{r['שם פרטי']} {r['שם משפחה']}",
+                    "site": r["שם מקום ההתמחות"],
+                    "score": int(r["אחוז התאמה"]),
+                    "parts": r["_expl"]  # {"התאמת תחום":..., "מרחק/גיאוגרפיה":..., ...}
+                })
 
             context.update({
                 "results": df_show.to_dict(orient="records"),
                 "summary": summary_df.to_dict(orient="records"),
                 "capacities": cap_df.to_dict(orient="records"),
-                "expl_for_first": expl_for_first,
+                "explanations": explanations,
                 "error": None
             })
 
@@ -475,5 +452,3 @@ def download_summary():
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
-
-
