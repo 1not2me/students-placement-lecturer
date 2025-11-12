@@ -15,39 +15,128 @@
         ובלחיצת כפתור מורידים קובצי XLSX מסודרים למרצים.
     </p>
 
-    <!-- טופס העלאה -->
+    <!-- הוראות שימוש -->
     <section class="card">
-        <h2>⬆️ העלאת קבצים</h2>
-        <p>יש להעלות קבצי סטודנטים ואתרי התמחות (Excel או CSV) בפורמט שנוח לכם.</p>
-        <form class="upload-form" method="post" enctype="multipart/form-data">
+        <h2>📘 הוראות שימוש</h2>
+        <ol class="instructions">
+            <li>
+                <strong>קובץ סטודנטים (CSV/XLSX):</strong>
+                כולל שם פרטי, שם משפחה, תעודת זהות, כתובת/עיר, טלפון, דוא״ל.
+                אופציונלי: תחום מועדף, בקשה מיוחדת (למשל: "קרוב לבית"), בן/בת זוג להכשרה.
+            </li>
+            <li>
+                <strong>קובץ אתרי התמחות/מדריכים (CSV/XLSX):</strong>
+                כולל שם מוסד/שירות, תחום התמחות, רחוב, עיר, קיבולת (מספר סטודנטים), שם המדריך/ה,
+                וחוות דעת מדריך (אופציונלי).
+            </li>
+            <li>
+                <strong>שיבוץ אוטומטי:</strong>
+                המערכת מחשבת אחוז התאמה לכל סטודנט/ית לפי תחום (50%), בקשות מיוחדות (45%), עיר (5%),
+                שומרת על קיבולת ומגבילה כמות סטודנטים לכל מדריך.
+            </li>
+            <li>
+                <strong>תוצרים:</strong>
+                טבלת שיבוץ, סיכום לפי מקום הכשרה, דוח קיבולות והורדת קבצים מותאמים ל-Excel.
+            </li>
+        </ol>
+    </section>
+
+    <!-- דוגמה לשימוש -->
+    <section class="card">
+        <h2>🧪 דוגמה לשימוש</h2>
+        <div class="examples">
+            <div>
+                <h3>סטודנטים – דוגמה</h3>
+                <div class="table-wrap small">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>שם פרטי</th>
+                            <th>שם משפחה</th>
+                            <th>תעודת זהות</th>
+                            <th>עיר מגורים</th>
+                            <th>טלפון</th>
+                            <th>דוא״ל</th>
+                            <th>תחום מועדף</th>
+                            <th>בקשה מיוחדת</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td>רות</td><td>כהן</td><td>123456789</td><td>תל אביב</td>
+                            <td>0501111111</td><td>ruth@example.com</td>
+                            <td>בריאות הנפש</td><td>קרוב לבית</td>
+                        </tr>
+                        <tr>
+                            <td>יואב</td><td>לוי</td><td>987654321</td><td>חיפה</td>
+                            <td>0502222222</td><td>yoav@example.com</td>
+                            <td>רווחה</td><td></td>
+                        </tr>
+                        <tr>
+                            <td>סמאח</td><td>ח'ורי</td><td>456789123</td><td>עכו</td>
+                            <td>0503333333</td><td>sama@example.com</td>
+                            <td>חינוך מיוחד</td><td></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div>
+                <h3>אתרי התמחות – דוגמה</h3>
+                <div class="table-wrap small">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>מוסד / שירות הכשרה</th>
+                            <th>תחום ההתמחות</th>
+                            <th>עיר</th>
+                            <th>קיבולת</th>
+                            <th>מדריך/ה</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td>מרכז חוסן תל אביב</td><td>בריאות הנפש</td><td>תל אביב</td><td>2</td><td>דניאל כהן</td>
+                        </tr>
+                        <tr>
+                            <td>מחלקת רווחה חיפה</td><td>רווחה</td><td>חיפה</td><td>1</td><td>מיכל לוי</td>
+                        </tr>
+                        <tr>
+                            <td>בית ספר יד לבנים</td><td>חינוך מיוחד</td><td>עכו</td><td>1</td><td>שרה כהן</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- העלאת קבצים + כפתור שיבוץ -->
+    <section class="card">
+        <h2>📤 העלאת קבצים וביצוע שיבוץ</h2>
+        <form method="post" enctype="multipart/form-data" class="upload-form">
             <div class="field">
-                <label for="students_file">📄 קובץ סטודנטים</label>
-                <input type="file" id="students_file" name="students_file" required>
+                <label>קובץ סטודנטים (CSV / XLSX)</label>
+                <input type="file" name="students_file" required>
             </div>
             <div class="field">
-                <label for="sites_file">🏥 קובץ אתרי התמחות</label>
-                <input type="file" id="sites_file" name="sites_file" required>
+                <label>קובץ אתרי התמחות / מדריכים (CSV / XLSX)</label>
+                <input type="file" name="sites_file" required>
             </div>
             <div class="btn-wrap">
-                <button type="submit" class="primary-btn">ביצוע שיבוץ חכם</button>
+                <button type="submit" class="primary-btn">🚀 בצע שיבוץ</button>
             </div>
         </form>
 
         {% if error %}
-        <div class="alert error">
-            {{ error }}
-        </div>
+        <div class="alert error">{{ error }}</div>
         {% endif %}
     </section>
 
     {% if results %}
-    <!-- תוצאות שיבוץ -->
+    <!-- תוצאות השיבוץ -->
     <section class="card">
-        <h2>📋 תוצאות השיבוץ</h2>
-        <div class="btn-row">
-            <a href="{{ url_for('download_results') }}" class="primary-btn small">⬇️ הורדת טבלת שיבוץ</a>
-            <a href="{{ url_for('download_summary') }}" class="primary-btn ghost small">⬇️ הורדת טבלת סיכום</a>
-        </div>
+        <h2>📊 תוצאות השיבוץ</h2>
         <div class="table-wrap">
             <table>
                 <thead>
@@ -64,39 +153,35 @@
                 <tbody>
                 {% for row in results %}
                     <tr>
-                        <td class="score">{{ row["אחוז התאמה"] }}%</td>
+                        <td class="score">{{ row["אחוז התאמה"] }}</td>
                         <td>{{ row["שם הסטודנט/ית"] }}</td>
                         <td>{{ row["תעודת זהות"] }}</td>
-                        <td>{{ row["תחום התמחות"] }}</td>
-                        <td>{{ row["עיר המוסד"] }}</td>
-                        <td>{{ row["שם מקום ההתמחות"] }}</td>
-                        <td>{{ row["שם המדריך/ה"] }}</td>
+                        <td>{{ row["תחום התמחות"] or "" }}</td>
+                        <td>{{ row["עיר המוסד"] or "" }}</td>
+                        <td>{{ row["שם מקום ההתמחות"] or "" }}</td>
+                        <td>{{ row["שם המדריך/ה"] or "" }}</td>
                     </tr>
                 {% endfor %}
                 </tbody>
             </table>
         </div>
+        <div class="btn-row">
+            <a href="{{ url_for('download_results') }}" class="primary-btn">⬇️ הורדת XLSX – תוצאות השיבוץ</a>
+        </div>
     </section>
     {% endif %}
 
-    {% if explanations %}
-    <!-- הסבר ציון לדוגמה עם ניווט בין כל הסטודנטים -->
-    <section class="card" id="score-explain-card">
+    {% if expl_for_first %}
+    <!-- הסבר ציון לדוגמה -->
+    <section class="card">
         <h2>🧩 הסבר ציון לדוגמה</h2>
-        <p id="score-summary">
-            סטודנט/ית:
-            <strong id="exp-student">{{ explanations[0].student }}</strong>,
-            מקום התמחות:
-            <strong id="exp-site">{{ explanations[0].site }}</strong>,
-            ציון סופי:
-            <strong id="exp-score">{{ explanations[0].score }}%</strong>
-            <span class="exp-counter">
-                (<span id="exp-index">1</span> / {{ explanations|length }})
-            </span>
+        <p>
+            סטודנט/ית: <strong>{{ expl_for_first.student }}</strong>,
+            מקום התמחות: <strong>{{ expl_for_first.site }}</strong>,
+            ציון סופי: <strong>{{ expl_for_first.score }}%</strong>
         </p>
-
         <div class="table-wrap small">
-            <table id="exp-table">
+            <table>
                 <thead>
                 <tr>
                     <th>מרכיב</th>
@@ -104,7 +189,7 @@
                 </tr>
                 </thead>
                 <tbody>
-                {% for k, v in explanations[0].parts.items() %}
+                {% for k, v in expl_for_first.parts.items() %}
                     <tr>
                         <td>{{ k }}</td>
                         <td>{{ v }}</td>
@@ -112,76 +197,24 @@
                 {% endfor %}
                     <tr>
                         <td><strong>סה״כ</strong></td>
-                        <td><strong id="exp-total">{{ explanations[0].score }}</strong></td>
+                        <td><strong>{{ expl_for_first.score }}</strong></td>
                     </tr>
                 </tbody>
             </table>
         </div>
-
-        <div class="exp-nav">
-            <button type="button" class="secondary-btn" id="exp-prev">◀ הקודם</button>
-            <button type="button" class="secondary-btn" id="exp-next">הבא ▶</button>
-        </div>
     </section>
-
-    <script>
-        const explanations = {{ explanations|tojson }};
-        let currentIndex = 0;
-
-        function renderExplain() {
-            const exp = explanations[currentIndex];
-
-            document.getElementById('exp-student').textContent = exp.student;
-            document.getElementById('exp-site').textContent = exp.site;
-            document.getElementById('exp-score').textContent = exp.score + '%';
-            document.getElementById('exp-index').textContent = (currentIndex + 1).toString();
-
-            const tbody = document.querySelector('#exp-table tbody');
-            tbody.innerHTML = '';
-
-            for (const [k, v] of Object.entries(exp.parts)) {
-                const tr = document.createElement('tr');
-                const td1 = document.createElement('td');
-                const td2 = document.createElement('td');
-                td1.textContent = k;
-                td2.textContent = v;
-                tr.appendChild(td1);
-                tr.appendChild(td2);
-                tbody.appendChild(tr);
-            }
-
-            const trTotal = document.createElement('tr');
-            const tdT1 = document.createElement('td');
-            const tdT2 = document.createElement('td');
-            tdT1.innerHTML = '<strong>סה״כ</strong>';
-            tdT2.innerHTML = '<strong>' + exp.score + '</strong>';
-            trTotal.appendChild(tdT1);
-            trTotal.appendChild(tdT2);
-            tbody.appendChild(trTotal);
-        }
-
-        document.getElementById('exp-prev').addEventListener('click', function () {
-            currentIndex = (currentIndex - 1 + explanations.length) % explanations.length;
-            renderExplain();
-        });
-
-        document.getElementById('exp-next').addEventListener('click', function () {
-            currentIndex = (currentIndex + 1) % explanations.length;
-            renderExplain();
-        });
-    </script>
     {% endif %}
 
     {% if summary %}
     <!-- סיכום לפי מקום הכשרה -->
     <section class="card">
-        <h2>📝 טבלת סיכום לפי מקום התמחות</h2>
+        <h2>📝 טבלת סיכום לפי מקום הכשרה</h2>
         <div class="table-wrap">
             <table>
                 <thead>
                 <tr>
                     <th>שם מקום ההתמחות</th>
-                    <th>תחום ההתמחות במוסד</th>
+                    <th>תחום</th>
                     <th>שם המדריך</th>
                     <th>כמה סטודנטים</th>
                     <th>המלצת שיבוץ</th>
@@ -192,7 +225,7 @@
                     <tr>
                         <td>{{ row["שם מקום ההתמחות"] }}</td>
                         <td>{{ row["תחום ההתמחות במוסד"] }}</td>
-                        <td>{{ row["שם המדריך"] }}</td>
+                        <td>{{ row["שם המדריך"] or "" }}</td>
                         <td>{{ row["כמה סטודנטים"] }}</td>
                         <td>{{ row["המלצת שיבוץ"] }}</td>
                     </tr>
@@ -200,13 +233,16 @@
                 </tbody>
             </table>
         </div>
+        <div class="btn-row">
+            <a href="{{ url_for('download_summary') }}" class="primary-btn">⬇️ הורדת XLSX – טבלת סיכום</a>
+        </div>
     </section>
     {% endif %}
 
     {% if capacities %}
-    <!-- קיבולת מוסדות -->
+    <!-- דוח קיבולות -->
     <section class="card">
-        <h2>📊 קיבולת מוסדות ושיבוץ בפועל</h2>
+        <h2>🏷️ דוח קיבולות לפי מקום הכשרה</h2>
         <div class="table-wrap small">
             <table>
                 <thead>
@@ -219,13 +255,11 @@
                 </thead>
                 <tbody>
                 {% for row in capacities %}
-                    <tr>
+                    <tr class="{% if row['יתרה/חוסר'] < 0 %}bad{% elif row['יתרה/חוסר'] > 0 %}good{% endif %}">
                         <td>{{ row["שם מקום ההתמחות"] }}</td>
                         <td>{{ row["קיבולת"] }}</td>
                         <td>{{ row["שובצו בפועל"] }}</td>
-                        <td class="{% if row['יתרה/חוסר'] < 0 %}bad{% elif row['יתרה/חוסר'] > 0 %}good{% endif %}">
-                            {{ row["יתרה/חוסר"] }}
-                        </td>
+                        <td>{{ row["יתרה/חוסר"] }}</td>
                     </tr>
                 {% endfor %}
                 </tbody>
@@ -233,71 +267,6 @@
         </div>
     </section>
     {% endif %}
-
-    <!-- דוגמה לשימוש -->
-    <section class="card">
-        <h2>🧪 דוגמה לשימוש</h2>
-        <div class="examples">
-            <div>
-                <h3>סטודנטים – דוגמה</h3>
-                <div class="table-wrap small">
-                    <table>
-                        <thead>
-                        <tr>
-                            <th>שם פרטי</th>
-                            <th>שם משפחה</th>
-                            <th>עיר</th>
-                            <th>תחום מועדף</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr>
-                            <td>נועה</td>
-                            <td>כהן</td>
-                            <td>צפת</td>
-                            <td>רווחה</td>
-                        </tr>
-                        <tr>
-                            <td>יאיר</td>
-                            <td>לוי</td>
-                            <td>נהריה</td>
-                            <td>בריאות הנפש</td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div>
-                <h3>אתרי התמחות – דוגמה</h3>
-                <div class="table-wrap small">
-                    <table>
-                        <thead>
-                        <tr>
-                            <th>שם מוסד</th>
-                            <th>עיר</th>
-                            <th>תחום</th>
-                            <th>קיבולת</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr>
-                            <td>מחלקת רווחה צפת</td>
-                            <td>צפת</td>
-                            <td>רווחה</td>
-                            <td>3</td>
-                        </tr>
-                        <tr>
-                            <td>מרפאת בריאות הנפש נהריה</td>
-                            <td>נהריה</td>
-                            <td>בריאות הנפש</td>
-                            <td>2</td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </section>
 
 </div>
 </body>
