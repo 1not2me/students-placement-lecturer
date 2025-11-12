@@ -400,6 +400,26 @@ def index():
                     "score": int(first["אחוז התאמה"]),
                     "parts": first["_expl"]
                 }
+                # ... אחרי base_df = greedy_match(...) וכו'
+
+# בניית רשימת הסברים מלאה לכל הסטודנטים
+explanations = []
+for _, r in base_df.iterrows():
+    explanations.append({
+        "student": f"{r['שם פרטי']} {r['שם משפחה']}",
+        "site": r["שם מקום ההתמחות"],
+        "score": int(r["אחוז התאמה"]),
+        "parts": r["_expl"]  # {"התאמת תחום":..., "מרחק/גיאוגרפיה":..., ...}
+    })
+
+context.update({
+    "results": df_show.to_dict(orient="records"),
+    "summary": summary_df.to_dict(orient="records"),
+    "capacities": cap_df.to_dict(orient="records"),
+    "explanations": explanations,   # <— חדש
+    "error": None
+})
+
 
             context.update({
                 "results": df_show.to_dict(orient="records"),
@@ -455,4 +475,5 @@ def download_summary():
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
+
 
