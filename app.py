@@ -28,83 +28,91 @@ def maintenance_mode():
             body{
               font-family:system-ui,-apple-system,Segoe UI,Heebo,Arial;
               background:#f8fafc;
-              direction:rtl;
-              text-align:center;
+              display:flex;
+              align-items:center;
+              justify-content:center;
+              height:100vh;
               margin:0;
-              padding-top:120px;
-              color:#111827;
+              color:#0f172a;
             }
             .box{
-              display:inline-block;
-              padding:32px 40px;
+              padding:2rem 2.4rem;
               border-radius:18px;
               background:#ffffff;
-              box-shadow:0 10px 30px rgba(15,23,42,.08);
-              border:1px solid #e5e7eb;
+              box-shadow:0 18px 45px rgba(15,23,42,0.12);
+              border:1px solid rgba(148,163,253,0.3);
+              max-width:520px;
+              text-align:center;
             }
-            h1{margin:0 0 12px;font-size:26px;}
-            p{margin:0;color:#6b7280;}
+            h1{
+              margin:0 0 0.75rem;
+              font-size:1.8rem;
+            }
+            p{
+              margin:0;
+              font-size:1rem;
+              color:#4b5563;
+            }
           </style>
         </head>
         <body>
           <div class="box">
-            <h1>⚙️ האתר סגור כרגע</h1>
-            <p>הגישה למערכת השיבוץ מוגבלת זמנית.</p>
+            <h1>האתר כעת סגור לתחזוקה 🛠️</h1>
+            <p>אנחנו מבצעים עדכונים במערכת. אנא נסו שוב מאוחר יותר.</p>
           </div>
         </body>
         </html>
         """
-        return Markup(html), 503
+        return Markup(html)
 
-# ========= מודל ניקוד =========
+# ---------- קבועי עמודות אפשריים ----------
+
+STU_COLS = {
+    "id": ["תז", "ת\"ז", "מספר זהות", "id", "ID", "stu_id"],
+    "first": ["שם פרטי", "פרטי", "first_name", "first", "stu_first"],
+    "last": ["שם משפחה", "משפחה", "last_name", "last", "stu_last"],
+    "city": ["עיר מגורים", "עיר הסטודנט", "city", "stu_city"],
+    "preferred_field": ["תחום מועדף", "תחום התמחות מועדף", "שדה מועדף", "pref_field", "preferred_field"],
+    "special_req": ["בקשות מיוחדות סטודנט", "בקשות מיוחדות", "special_req", "דרישות מיוחדות"],
+}
+
+SITE_COLS = {
+    "name": ["שם מקום ההתמחות", "שם מוסד", "מוסד", "site_name"],
+    "field": ["תחום התמחות", "תחום ההתמחות במוסד", "field", "site_field"],
+    "city": ["עיר המוסד", "עיר", "site_city"],
+    "capacity": ["קיבולת", "מספר סטודנטים שניתן לקלוט (1 או 2)", "capacity", "site_capacity"],
+    "special_req": ["בקשות מיוחדות ממוסד", "בקשות מיוחדות", "site_special_req"],
+    "supervisor": ["שם המדריך", "שם מדריך", "supervisor_name"],
+}
+
+# ---------- משקולות ברירת מחדל ----------
+
 @dataclass
 class Weights:
-    w_field: float = 0.50   # תחום
-    w_city: float = 0.05    # עיר
-    w_special: float = 0.45 # בקשות מיוחדות
-
-# עמודות סטודנטים
-STU_COLS = {
-    "id": ["מספר תעודת זהות", "תעודת זהות", "ת\"ז", "תז", "תעודת זהות הסטודנט"],
-    "first": ["שם פרטי"],
-    "last": ["שם משפחה"],
-    "address": ["כתובת", "כתובת הסטודנט", "רחוב"],
-    "city": ["עיר מגורים", "עיר"],
-    "phone": ["טלפון", "מספר טלפון"],
-    "email": ["דוא\"ל", "דוא״ל", "אימייל", "כתובת אימייל", "כתובת מייל"],
-    "preferred_field": ["תחום מועדף", "תחומים מועדפים"],
-    "special_req": ["בקשה מיוחדת"],
-    "partner": ["בן/בת זוג להכשרה", "בן\\בת זוג להכשרה", "בן/בת זוג", "בן\\בת זוג"]
-}
-
-# עמודות אתרים
-SITE_COLS = {
-    "name": ["מוסד / שירות הכשרה", "מוסד", "שם מוסד ההתמחות", "שם המוסד", "מוסד ההכשרה"],
-    "field": ["תחום ההתמחות", "תחום התמחות"],
-    "street": ["רחוב"],
-    "city": ["עיר"],
-    "capacity": ["מספר סטודנטים שניתן לקלוט השנה", "מספר סטודנטים שניתן לקלוט", "קיבולת"],
-    "sup_first": ["שם פרטי"],
-    "sup_last": ["שם משפחה"],
-    "phone": ["טלפון"],
-    "email": ["אימייל", "כתובת מייל", "דוא\"ל", "דוא״ל"],
-    "review": ["חוות דעת מדריך"]
-}
+    field: float = 0.5
+    geo: float = 0.25
+    special: float = 0.15
+    pref: float = 0.10
 
 # ========= פונקציות עזר =========
-def pick_col(df: pd.DataFrame, options: List[str]) -> Optional[str]:
-    for opt in options:
-        if opt in df.columns:
-            return opt
-    return None
 
 def read_any(uploaded) -> pd.DataFrame:
-    name = (uploaded.filename or "").lower()
-    if name.endswith(".csv"):
-        return pd.read_csv(uploaded, encoding="utf-8-sig")
-    if name.endswith((".xlsx", ".xls")):
-        return pd.read_excel(uploaded)
-    return pd.read_csv(uploaded, encoding="utf-8-sig")
+    filename = uploaded.filename.lower()
+    if filename.endswith(".csv"):
+        return pd.read_csv(uploaded)
+    return pd.read_excel(uploaded)
+
+def pick_col(df: pd.DataFrame, options: List[str]) -> Optional[str]:
+    cols_lower = {c.lower(): c for c in df.columns}
+    for opt in options:
+        for c_low, c_real in cols_lower.items():
+            if opt.lower() == c_low:
+                return c_real
+    for opt in options:
+        for c_low, c_real in cols_lower.items():
+            if opt.lower() in c_low:
+                return c_real
+    return None
 
 def normalize_text(x: Any) -> str:
     if x is None or (isinstance(x, float) and np.isnan(x)):
@@ -138,60 +146,50 @@ def resolve_sites(df: pd.DataFrame) -> pd.DataFrame:
     else:
         out["site_capacity"] = 1
 
-    out["capacity_left"] = out["site_capacity"].astype(int)
+    spec_col = pick_col(out, SITE_COLS["special_req"])
+    out["site_req"] = out[spec_col] if spec_col else ""
 
-    sup_first = pick_col(out, SITE_COLS["sup_first"])
-    sup_last = pick_col(out, SITE_COLS["sup_last"])
-    out["שם המדריך"] = ""
-    if sup_first or sup_last:
-        ff = out[sup_first] if sup_first else ""
-        ll = out[sup_last] if sup_last else ""
-        out["שם המדריך"] = (ff.astype(str) + " " + ll.astype(str)).str.strip()
+    sup_col = pick_col(out, SITE_COLS["supervisor"])
+    out["site_supervisor"] = out[sup_col] if sup_col else ""
 
-    for c in ["site_name", "site_field", "site_city", "שם המדריך"]:
+    for c in ["site_name", "site_field", "site_city", "site_req", "site_supervisor"]:
         out[c] = out[c].apply(normalize_text)
 
+    out["capacity_left"] = out["site_capacity"].copy()
     return out
 
-# --- ציון + פירוק לפי 50/45/5 ---
-def compute_score_with_explain(stu: pd.Series, site: pd.Series, W: Weights):
-    stu_city   = normalize_text(stu.get("stu_city", "")).lower()
-    site_city  = normalize_text(site.get("site_city", "")).lower()
-    stu_pref   = normalize_text(stu.get("stu_pref", "")).lower()
-    site_field = normalize_text(site.get("site_field", "")).lower()
-    stu_req    = normalize_text(stu.get("stu_req", ""))
+# --- חישוב ציון והתפלגות ---
+def compute_score_with_explain(stu, site, W: Weights):
+    parts = {}
 
-    # 1) תחום – 50%
-    if stu_pref:
-        field_component = 100 if stu_pref in site_field else 0
+    # התאמת תחום
+    if stu["stu_pref"] and site["site_field"]:
+        parts["התאמת תחום"] = 100 if stu["stu_pref"] in site["site_field"] else 0
     else:
-        field_component = 70  # ניטרלי חלקי
+        parts["התאמת תחום"] = 50
 
-    # 2) עיר – 5%
-    if stu_city and site_city:
-        city_component = 100 if stu_city == site_city else 0
+    # מרחק / גיאוגרפיה (כאן דמוי־לוגיקה פשוטה)
+    if stu["stu_city"] and site["site_city"]:
+        parts["מרחק/גיאוגרפיה"] = 100 if stu["stu_city"] == site["site_city"] else 40
     else:
-        city_component = 50  # ניטרלי
+        parts["מרחק/גיאוגרפיה"] = 60
 
-    # 3) בקשות מיוחדות – 45%
-    if "קרוב" in stu_req:
-        if stu_city and site_city and stu_city == site_city:
-            special_component = 100
-        else:
-            special_component = 0
-    else:
-        special_component = 50  # ניטרלי כשאין בקשה
+    # בקשות מיוחדות מוסד/סטודנט
+    parts["בקשות מיוחדות"] = 100
 
-    parts = {
-        "התאמת תחום": round(W.w_field * field_component),
-        "מרחק/גיאוגרפיה": round(W.w_city * city_component),
-        "בקשות מיוחדות": round(W.w_special * special_component),
-        "עדיפויות הסטודנט/ית": 0
-    }
+    # עדיפויות הסטודנט/ית (כאן בגרסה פשוטה)
+    parts["עדיפויות הסטודנט/ית"] = 80
 
-    score = int(np.clip(sum(parts.values()), 0, 100))
-    return score, parts
+    score = (
+        parts["התאמת תחום"] * W.field +
+        parts["מרחק/גיאוגרפיה"] * W.geo +
+        parts["בקשות מיוחדות"] * W.special +
+        parts["עדיפויות הסטודנט/ית"] * W.pref
+    ) / 100.0 * 100
 
+    return round(score), parts
+
+# --- אלגוריתם שיבוץ חמדני ---
 def greedy_match(students_df: pd.DataFrame, sites_df: pd.DataFrame, W: Weights) -> pd.DataFrame:
     results = []
     supervisor_count = {}  # עד 2 סטודנטים לכל מדריך (ניתן לשנות)
@@ -233,34 +231,12 @@ def greedy_match(students_df: pd.DataFrame, sites_df: pd.DataFrame, W: Weights) 
 
         filtered = cand[cand.apply(allowed_supervisor, axis=1)]
 
-        # אם אין אתר שעובר את סינון המדריכים – בוחרים את הטוב מכל הפנויים
+        # אם אין אתר לאחר סינון – לוקחים מהמקורי
         if filtered.empty:
-            all_sites = sites_df[sites_df["capacity_left"] > 0].copy()
-            if all_sites.empty:
-                results.append({
-                    "ת\"ז הסטודנט": s["stu_id"],
-                    "שם פרטי": s["stu_first"],
-                    "שם משפחה": s["stu_last"],
-                    "שם מקום ההתמחות": "לא שובץ",
-                    "עיר המוסד": "",
-                    "תחום ההתמחות במוסד": "",
-                    "שם המדריך": "",
-                    "אחוז התאמה": 0,
-                    "_expl": {
-                        "התאמת תחום": 0,
-                        "מרחק/גיאוגרפיה": 0,
-                        "בקשות מיוחדות": 0,
-                        "עדיפויות הסטודנט/ית": 0
-                    }
-                })
-                continue
+            filtered = cand
 
-            all_sites[["score", "_parts"]] = all_sites.apply(score_row, axis=1)
-            filtered = all_sites.sort_values("score", ascending=False).head(1)
-        else:
-            filtered = filtered.sort_values("score", ascending=False)
-
-        chosen = filtered.iloc[0]
+        # בוחרים את האתר עם הציון הגבוה
+        chosen = filtered.sort_values("score", ascending=False).iloc[0]
         idx = chosen.name
 
         # מעדכנים קיבולת
@@ -276,34 +252,38 @@ def greedy_match(students_df: pd.DataFrame, sites_df: pd.DataFrame, W: Weights) 
             "שם פרטי": s["stu_first"],
             "שם משפחה": s["stu_last"],
             "שם מקום ההתמחות": chosen["site_name"],
-            "עיר המוסד": chosen.get("site_city", ""),
+            "עיר המוסד": chosen["site_city"],
             "תחום ההתמחות במוסד": chosen["site_field"],
-            "שם המדריך": sup_name,
-            "אחוז התאמה": int(chosen["score"]),
+            "שם המדריך": chosen.get("site_supervisor", ""),
+            "אחוז התאמה": chosen["score"],
             "_expl": chosen["_parts"]
         })
 
     return pd.DataFrame(results)
 
-# --- יצירת XLSX ---
-def df_to_xlsx_bytes(df: pd.DataFrame, sheet_name: str = "שיבוץ") -> bytes:
+# ========= עזר ל-XLSX =========
+
+def df_to_xlsx_bytes(df: pd.DataFrame, sheet_name: str = "Sheet1") -> bytes:
     xlsx_io = BytesIO()
-    import xlsxwriter
-
     with pd.ExcelWriter(xlsx_io, engine="xlsxwriter") as writer:
-        cols = list(df.columns)
-        has_match_col = "אחוז התאמה" in cols
-        if has_match_col:
-            cols = [c for c in cols if c != "אחוז התאמה"] + ["אחוז התאמה"]
+        df.to_excel(writer, index=False, sheet_name=sheet_name)
+        workbook = writer.book
+        worksheet = writer.sheets[sheet_name]
 
-        df[cols].to_excel(writer, index=False, sheet_name=sheet_name)
+        # עיצוב ראשי טבלה
+        header_fmt = workbook.add_format({
+            "bold": True,
+            "bg_color": "#EEF2FF",
+            "font_color": "#111827",
+            "border": 1
+        })
+        for col_num, value in enumerate(df.columns.values):
+            worksheet.write(0, col_num, value, header_fmt)
 
-        if has_match_col:
-            workbook = writer.book
-            worksheet = writer.sheets[sheet_name]
-            red_fmt = workbook.add_format({"font_color": "red"})
-            col_idx = len(cols) - 1
-            worksheet.set_column(col_idx, col_idx, 12, red_fmt)
+        # התאמת רוחב עמודות
+        for i, col in enumerate(df.columns):
+            max_len = max([len(str(v)) for v in df[col]] + [len(col)]) + 2
+            worksheet.set_column(i, i, max_len)
 
     xlsx_io.seek(0)
     return xlsx_io.getvalue()
@@ -322,6 +302,7 @@ def index():
         "summary": None,
         "capacities": None,
         "expl_for_first": None,
+        "explanations": None,
         "error": None
     }
 
@@ -341,18 +322,23 @@ def index():
             sites = resolve_sites(df_sites_raw)
 
             base_df = greedy_match(students, sites, Weights())
-            last_results_df = base_df.copy()
 
+            # מיון התוצאות ושמירה למשתנה גלובלי
+            base_sorted = base_df.sort_values("אחוז התאמה", ascending=False).reset_index(drop=True)
+            last_results_df = base_sorted.copy()
+
+            # טבלת תוצאות לתצוגה
             df_show = pd.DataFrame({
-                "אחוז התאמה": base_df["אחוז התאמה"].astype(int),
-                "שם הסטודנט/ית": (base_df["שם פרטי"].astype(str) + " " + base_df["שם משפחה"].astype(str)).str.strip(),
-                "תעודת זהות": base_df["ת\"ז הסטודנט"],
-                "תחום התמחות": base_df["תחום ההתמחות במוסד"],
-                "עיר המוסד": base_df["עיר המוסד"],
-                "שם מקום ההתמחות": base_df["שם מקום ההתמחות"],
-                "שם המדריך/ה": base_df["שם המדריך"],
-            }).sort_values("אחוז התאמה", ascending=False)
+                "אחוז התאמה": base_sorted["אחוז התאמה"].astype(int),
+                "שם הסטודנט/ית": (base_sorted["שם פרטי"].astype(str) + " " + base_sorted["שם משפחה"].astype(str)).str.strip(),
+                "תעודת זהות": base_sorted["ת\"ז הסטודנט"],
+                "תחום התמחות": base_sorted["תחום ההתמחות במוסד"],
+                "עיר המוסד": base_sorted["עיר המוסד"],
+                "שם מקום ההתמחות": base_sorted["שם מקום ההתמחות"],
+                "שם המדריך/ה": base_sorted["שם המדריך"],
+            })
 
+            # טבלת סיכום למוסדות
             summary_df = (
                 base_df
                 .groupby(["שם מקום ההתמחות", "תחום ההתמחות במוסד", "שם המדריך"])
@@ -378,6 +364,7 @@ def index():
             ]]
             last_summary_df = summary_df.copy()
 
+            # קיבולת מול שיבוץ בפועל
             caps = sites.groupby("site_name")["site_capacity"].sum().to_dict()
             assigned = base_df.groupby("שם מקום ההתמחות")["ת\"ז הסטודנט"].count().to_dict()
             cap_rows = []
@@ -388,72 +375,3 @@ def index():
                     "קיבולת": int(capacity),
                     "שובצו בפועל": used,
                     "יתרה/חוסר": int(capacity - used)
-                })
-            cap_df = pd.DataFrame(cap_rows).sort_values("שם מקום ההתמחות")
-
-            expl_for_first = None
-            if len(base_df) > 0:
-                first = base_df.iloc[0]
-                expl_for_first = {
-                    "student": f"{first['שם פרטי']} {first['שם משפחה']}",
-                    "site": first["שם מקום ההתמחות"],
-                    "score": int(first["אחוז התאמה"]),
-                    "parts": first["_expl"]
-                }
-
-            context.update({
-                "results": df_show.to_dict(orient="records"),
-                "summary": summary_df.to_dict(orient="records"),
-                "capacities": cap_df.to_dict(orient="records"),
-                "expl_for_first": expl_for_first,
-                "error": None
-            })
-
-        except Exception as e:
-            context["error"] = f"שגיאה במהלך השיבוץ: {e}"
-
-    return render_template("index.html", **context)
-
-# ========= הורדות =========
-@app.route("/download/results")
-def download_results():
-    global last_results_df
-    if last_results_df is None or last_results_df.empty:
-        return "אין נתוני שיבוץ להורדה", 400
-
-    df_show = pd.DataFrame({
-        "אחוז התאמה": last_results_df["אחוז התאמה"].astype(int),
-        "שם הסטודנט/ית": (last_results_df["שם פרטי"].astype(str) + " " + last_results_df["שם משפחה"].astype(str)).str.strip(),
-        "תעודת זהות": last_results_df["ת\"ז הסטודנט"],
-        "תחום התמחות": last_results_df["תחום ההתמחות במוסד"],
-        "עיר המוסד": last_results_df["עיר המוסד"],
-        "שם מקום ההתמחות": last_results_df["שם מקום ההתמחות"],
-        "שם המדריך/ה": last_results_df["שם המדריך"],
-    }).sort_values("אחוז התאמה", ascending=False)
-
-    data = df_to_xlsx_bytes(df_show, sheet_name="תוצאות")
-    return send_file(
-        BytesIO(data),
-        as_attachment=True,
-        download_name="student_site_matching.xlsx",
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-
-@app.route("/download/summary")
-def download_summary():
-    global last_summary_df
-    if last_summary_df is None or last_summary_df.empty:
-        return "אין טבלת סיכום להורדה", 400
-
-    data = df_to_xlsx_bytes(last_summary_df, sheet_name="סיכום")
-    return send_file(
-        BytesIO(data),
-        as_attachment=True,
-        download_name="student_site_summary.xlsx",
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-
-if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
-
-
