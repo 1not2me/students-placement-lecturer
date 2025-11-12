@@ -171,39 +171,83 @@
     </section>
     {% endif %}
 
-    {% if expl_for_first %}
-    <!-- הסבר ציון לדוגמה -->
-    <section class="card">
-        <h2>🧩 הסבר ציון לדוגמה</h2>
-        <p>
-            סטודנט/ית: <strong>{{ expl_for_first.student }}</strong>,
-            מקום התמחות: <strong>{{ expl_for_first.site }}</strong>,
-            ציון סופי: <strong>{{ expl_for_first.score }}%</strong>
-        </p>
-        <div class="table-wrap small">
-            <table>
-                <thead>
-                <tr>
-                    <th>מרכיב</th>
-                    <th>תרומה לציון</th>
-                </tr>
-                </thead>
-                <tbody>
-                {% for k, v in expl_for_first.parts.items() %}
-                    <tr>
-                        <td>{{ k }}</td>
-                        <td>{{ v }}</td>
-                    </tr>
-                {% endfor %}
-                    <tr>
-                        <td><strong>סה״כ</strong></td>
-                        <td><strong>{{ expl_for_first.score }}</strong></td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </section>
-    {% endif %}
+{% if explanations and explanations|length > 0 %}
+<section class="card" id="explain-card">
+  <h2>🧩 הסבר ציון – דפדוף בין הסטודנטים</h2>
+
+  <!-- מעבירים את המידע מהשרת ל-JS -->
+  <script id="expl-data" type="application/json">
+    {{ explanations | tojson }}
+  </script>
+
+  <p id="expl-header" style="margin-bottom:.6rem;">
+    סטודנט/ית: <strong id="expl-stu"></strong>,
+    מקום התמחות: <strong id="expl-site"></strong>,
+    ציון סופי: <strong id="expl-score"></strong>% 
+    <span id="expl-pos" style="color:#64748b; margin-right:.5rem;"></span>
+  </p>
+
+  <div class="table-wrap small">
+    <table id="expl-table">
+      <thead>
+        <tr><th>מרכיב</th><th>תרומה לציון</th></tr>
+      </thead>
+      <tbody id="expl-tbody"></tbody>
+      <tfoot>
+        <tr><td><strong>סה״כ</strong></td><td><strong id="expl-total"></strong></td></tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <div class="btn-row" style="justify-content:center;">
+    <button type="button" class="primary-btn" id="btn-prev">⬅️ הקודם</button>
+    <button type="button" class="primary-btn" id="btn-next">הבא ➡️</button>
+  </div>
+</section>
+
+<script>
+(function(){
+  const data = JSON.parse(document.getElementById('expl-data').textContent || '[]');
+  if (!Array.isArray(data) || data.length === 0) return;
+
+  let i = 0;
+  const elStu = document.getElementById('expl-stu');
+  const elSite = document.getElementById('expl-site');
+  const elScore = document.getElementById('expl-score');
+  const elPos = document.getElementById('expl-pos');
+  const elTBody = document.getElementById('expl-tbody');
+  const elTotal = document.getElementById('expl-total');
+
+  function render(){
+    const row = data[i];
+    elStu.textContent = row.student || '';
+    elSite.textContent = row.site || '';
+    elScore.textContent = (row.score ?? '');
+    elPos.textContent = `(${i+1} מתוך ${data.length})`;
+
+    elTBody.innerHTML = '';
+    let sum = 0;
+    for (const [k,v] of Object.entries(row.parts || {})){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${k}</td><td>${v}</td>`;
+      elTBody.appendChild(tr);
+      sum += (typeof v === 'number' ? v : 0);
+    }
+    elTotal.textContent = sum;
+  }
+
+  function next(){ i = (i + 1) % data.length; render(); }
+  function prev(){ i = (i - 1 + data.length) % data.length; render(); }
+
+  document.getElementById('btn-next').addEventListener('click', next);
+  document.getElementById('btn-prev').addEventListener('click', prev);
+  window.addEventListener('keydown', (e)=>{ if(e.key==='ArrowRight')next(); if(e.key==='ArrowLeft')prev(); });
+
+  render();
+})();
+</script>
+{% endif %}
+
 
     {% if summary %}
     <!-- סיכום לפי מקום הכשרה -->
@@ -271,3 +315,4 @@
 </div>
 </body>
 </html>
+
