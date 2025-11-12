@@ -280,3 +280,52 @@ tr.bad td:last-child {
         width: 100%;
     }
 }
+/* ====== ניווט הסבר ציון ====== */
+#explain-card .btn-row{
+  display:flex;
+  justify-content:space-between;   /* שמאל/ימין כמו בדוגמה */
+  align-items:center;
+  gap:16px;
+  margin-top:16px;
+}
+
+#explain-card .btn{
+  appearance:none;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:10px 22px;
+  font-weight:700;
+  border-radius:9999px;            /* גלולות */
+  border:0;
+  cursor:pointer;
+  white-space:nowrap;
+  transition:transform .12s ease, box-shadow .12s ease, background .12s ease;
+  min-width:120px;                 /* גודל נוח */
+}
+
+/* צבעוני (Primary) – כמו הכפתורים היפים שלך */
+#explain-card .btn--primary{
+  background:var(--grad-main, linear-gradient(90deg,#f05da8 0%,#a855f7 100%));
+  color:#fff;
+  box-shadow:0 10px 24px rgba(168,85,247,.18);
+}
+#explain-card .btn--primary:hover{ transform:translateY(-1px); }
+
+/* Ghost בהיר לימין */
+#explain-card .btn--ghost{
+  background:#f6f8fb;
+  color:#6b7280;
+  border:1px solid #e5e7eb;
+  box-shadow:0 6px 18px rgba(15,23,42,.06);
+}
+#explain-card .btn--ghost:hover{ background:#eef2f7; }
+
+/* ביטול רוחב-מלא אם הוגדר היסטורית */
+#explain-card .primary-btn,
+#explain-card .secondary-btn{
+  width:auto !important;
+  display:inline-flex !important;
+}
+
+
