@@ -68,7 +68,8 @@ STU_COLS = {
     "id": ["מספר תעודת זהות", "תעודת זהות", "ת\"ז", "תז", "תעודת זהות הסטודנט"],
     "first": ["שם פרטי"],
     "last": ["שם משפחה"],
-    "address": ["כתובת", "כתובת הסטודנט", "רחוב"],
+    # חדש – כתובת, למקרה שאין עמודת עיר
+    "address": ["כתובת", "כתובת מלאה", "כתובת הסטודנט"],
     "city": ["עיר מגורים", "עיר"],
     "phone": ["טלפון", "מספר טלפון"],
     "email": ["דוא\"ל", "דוא״ל", "אימייל", "כתובת אימייל", "כתובת מייל"],
@@ -114,14 +115,33 @@ def normalize_text(x: Any) -> str:
 # --- סטודנטים ---
 def resolve_students(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
+
     out["stu_id"] = out[pick_col(out, STU_COLS["id"])]
     out["stu_first"] = out[pick_col(out, STU_COLS["first"])]
     out["stu_last"] = out[pick_col(out, STU_COLS["last"])]
-    out["stu_city"] = out[pick_col(out, STU_COLS["city"])] if pick_col(out, STU_COLS["city"]) else ""
-    out["stu_pref"] = out[pick_col(out, STU_COLS["preferred_field"])] if pick_col(out, STU_COLS["preferred_field"]) else ""
-    out["stu_req"] = out[pick_col(out, STU_COLS["special_req"])] if pick_col(out, STU_COLS["special_req"]) else ""
+
+    # עיר – קודם מנסים עמודת "עיר", ואם אין – מחלצים מהכתובת (החלק אחרי הפסיק)
+    city_col = pick_col(out, STU_COLS["city"])
+    if city_col:
+        out["stu_city"] = out[city_col]
+    else:
+        addr_col = pick_col(out, STU_COLS.get("address", []))
+        if addr_col:
+            out["stu_city"] = out[addr_col].apply(
+                lambda x: str(x).split(",")[-1].strip() if isinstance(x, str) and "," in x else ""
+            )
+        else:
+            out["stu_city"] = ""
+
+    pref_col = pick_col(out, STU_COLS["preferred_field"])
+    out["stu_pref"] = out[pref_col] if pref_col else ""
+
+    req_col = pick_col(out, STU_COLS["special_req"])
+    out["stu_req"] = out[req_col] if req_col else ""
+
     for c in ["stu_id", "stu_first", "stu_last", "stu_city", "stu_pref", "stu_req"]:
         out[c] = out[c].apply(normalize_text)
+
     return out
 
 # --- אתרים ---
@@ -130,6 +150,7 @@ def resolve_sites(df: pd.DataFrame) -> pd.DataFrame:
     out["site_name"] = out[pick_col(out, SITE_COLS["name"])]
     out["site_field"] = out[pick_col(out, SITE_COLS["field"])]
     out["site_city"] = out[pick_col(out, SITE_COLS["city"])]
+
     cap_col = pick_col(out, SITE_COLS["capacity"])
     if cap_col:
         out["site_capacity"] = pd.to_numeric(out[cap_col], errors="coerce").fillna(1).astype(int)
@@ -158,25 +179,41 @@ def compute_score_with_explain(stu: pd.Series, site: pd.Series, W: Weights):
     stu_req    = normalize_text(stu.get("stu_req", ""))
 
     # 1) תחום – 50%
+    # לסטודנט/ית יכולים להיות כמה תחומים: "רווחה; שיקום; קהילה"
     if stu_pref:
-        field_component = 100 if stu_pref in site_field else 0
+        tokens = [t.strip() for t in stu_pref.replace(";", ",").split(",") if t.strip()]
+        if tokens:
+            field_component = 100 if any(tok in site_field for tok in tokens) else 0
+        else:
+            field_component = 70
     else:
-        field_component = 70  # ניטרלי חלקי
+        field_component = 70  # ניטרלי חלקי כשאין העדפה בכלל
 
     # 2) עיר – 5%
     if stu_city and site_city:
         city_component = 100 if stu_city == site_city else 0
     else:
-        city_component = 50  # ניטרלי
+        city_component = 50  # ניטרלי כשאין מידע מלא
 
     # 3) בקשות מיוחדות – 45%
-    if "קרוב" in stu_req:
-        if stu_city and site_city and stu_city == site_city:
-            special_component = 100
+    stu_req_lower = stu_req.lower()
+    # "קרוב לבית" – אם יש גם עיר, בודקים התאמה; אם אין – ניטרלי
+    if "קרוב" in stu_req_lower:
+        if stu_city and site_city:
+            special_component = 100 if stu_city == site_city else 0
         else:
-            special_component = 0
+            special_component = 50  # לא מענישים על חוסר מידע
+    # "אזור צפון" – התאמה חלקית אם המוסד בצפון
+    elif "צפון" in stu_req_lower:
+        north_cities = ["צפת", "כרמיאל", "נהריה", "עכו", "קריית שמונה", "טבריה", "חורפיש"]
+        north_cities = [c.lower() for c in north_cities]
+        if site_city in north_cities:
+            special_component = 75  # חלקי – בסביבות 80–85% יחד עם תחום
+        else:
+            special_component = 50
     else:
-        special_component = 50  # ניטרלי כשאין בקשה
+        # אין בקשה מיוחדת – ניטרלי
+        special_component = 50
 
     parts = {
         "התאמת תחום": round(W.w_field * field_component),
